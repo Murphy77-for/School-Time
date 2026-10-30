@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>準備紀錄</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#6b7280; --main:#2f6fed; --plus:#15803d; --minus:#c2410c; --line:rgba(128,128,128,.25); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --card:#1c2130; --text:#eef1f7; --muted:#9aa3b5; --plus:#4ade80; --minus:#fb923c; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif; }
+  .wrap { max-width:560px; margin:0 auto; padding:16px; }
+  a { color:var(--main); text-decoration:none; }
+  .top { display:flex; justify-content:space-between; align-items:center; margin:4px 0 12px; }
+  h1 { font-size:20px; margin:0; }
+  h2 { font-size:16px; margin:0 0 10px; }
+  .card { background:var(--card); border-radius:16px; padding:18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .muted { color:var(--muted); font-size:14px; }
+  .kids { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .kid { border:1px solid var(--line); border-radius:14px; padding:14px; text-align:center; }
+  .kid .name { font-weight:700; font-size:17px; cursor:pointer; }
+  .kid .big { font-size:34px; font-weight:700; margin:6px 0 2px; font-variant-numeric:tabular-nums; }
+  .pos { color:var(--plus); } .neg { color:var(--minus); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th, td { padding:8px 4px; text-align:center; border-bottom:1px solid var(--line); font-size:15px; }
+  th { color:var(--muted); font-weight:500; font-size:13px; }
+  td.date { text-align:left; }
+  .sub { display:block; font-size:12px; color:var(--muted); }
+  tfoot td { font-weight:700; border-bottom:0; }
+  .form { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .form .full { grid-column:1 / -1; }
+  input, select { font:inherit; padding:10px; border-radius:10px; border:1px solid #c5cad6; background:var(--card); color:var(--text); width:100%; }
+  button { font:inherit; border:0; border-radius:12px; padding:11px 14px; background:var(--main); color:#fff; cursor:pointer; width:100%; margin-top:8px; }
+  button.ghost { background:transparent; color:var(--main); border:1px solid var(--main); }
+  .status { font-size:13px; color:var(--muted); text-align:center; }
+  .status.err { color:var(--minus); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><h1>準備紀錄</h1><a href="index.html">← 回首頁</a></div>
+  <div class="status" id="status">連線中…</div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>累計分數 <span class="muted">(= 週末看電視的分鐘數)</span></h2>
+    <div class="kids" id="totals"></div>
+  </div>
+
+  <div class="card">
+    <h2>每日紀錄</h2>
+    <table>
+      <thead><tr><th style="text-align:left">日期</th><th id="thA"></th><th id="thB"></th></tr></thead>
+      <tbody id="rows"><tr><td colspan="3" class="muted">還沒有紀錄</td></tr></tbody>
+      <tfoot id="foot"></tfoot>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>補登 / 修改</h2>
+    <div class="form">
+      <select id="fKid"></select>
+      <input id="fDate" type="date">
+      <input id="fTime" type="time" class="full">
+    </div>
+    <button id="fSave">儲存這筆</button>
+    <button class="ghost" id="fDel">刪除這天這位的紀錄</button>
+  </div>
+
+  <div class="card">
+    <h2>改名字</h2>
+    <div class="form">
+      <input id="nA" maxlength="10"><input id="nB" maxlength="10">
+    </div>
+    <button class="ghost" id="nSave">儲存名字</button>
+  </div>
+
+  <p class="muted" style="text-align:center">規則:6:50 前每早 1 分 +1 · 6:50~7:00 不計 · 7:00 後每晚 1 分 −1</p>
+</div>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyDAUyONij0-f5ffYa82NqS2aQQm3AAW0bY",
+  authDomain: "school-time-f3d35.firebaseapp.com",
+  databaseURL: "https://school-time-f3d35-default-rtdb.firebaseio.com",
+  projectId: "school-time-f3d35",
+  storageBucket: "school-time-f3d35.firebasestorage.app",
+  messagingSenderId: "951888295382",
+  appId: "1:951888295382:web:757dd2570d51c125af2077"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const $ = id => document.getElementById(id);
+const KIDS = ["a", "b"];
+const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+let db, roomCode = (localStorage.getItem("room") || "").trim();
+let names = { a: "晏", b: "宸" }, records = {}, unsubs = [];
+
+function calcPoints(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const mins = h * 60 + m;
+  if (mins < 410) return 410 - mins;
+  if (mins > 420) return -(mins - 420);
+  return 0;
+}
+const fmt = p => (p > 0 ? "+" + p : String(p));
+const cls = p => (p > 0 ? "pos" : p < 0 ? "neg" : "");
+const pad = n => String(n).padStart(2, "0");
+const dateKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const weekdayOf = key => WEEK[new Date(key + "T00:00:00").getDay()];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const setStatus = (t, err) => { $("status").textContent = t; $("status").className = "status" + (err ? " err" : ""); };
+
+function connect() {
+  if (!roomCode) { setStatus("還沒設定家庭代碼,請先回首頁設定", true); return; }
+  try { if (!db) db = getDatabase(initializeApp(firebaseConfig)); }
+  catch (e) { setStatus("資料庫設定有誤:" + e.message, true); return; }
+  const base = "rooms/" + roomCode, onErr = e => setStatus("無法讀寫資料庫:" + e.message, true);
+  onValue(ref(db, base + "/names"), s => { names = Object.assign({ a: "晏", b: "宸" }, s.val() || {}); render(); }, onErr);
+  onValue(ref(db, base + "/records"), s => { records = s.val() || {}; setStatus("已連線"); render(); }, onErr);
+}
+
+const guard = () => { if (!db || !roomCode) { alert("請先回首頁設定家庭代碼"); return false; } return true; };
+
+function totalOf(kid, filter) {
+  let sum = 0;
+  Object.keys(records).forEach(d => {
+    if (filter && !filter(d)) return;
+    const r = records[d] && records[d][kid];
+    if (r && typeof r.points === "number") sum += r.points;
+  });
+  return sum;
+}
+
+function render() {
+  const wk = new Date(); wk.setHours(0, 0, 0, 0); wk.setDate(wk.getDate() - ((wk.getDay() + 6) % 7));
+  const wkKey = dateKey(wk);
+  $("totals").innerHTML = KIDS.map(k => {
+    const t = totalOf(k), w = totalOf(k, d => d >= wkKey);
+    return `<div class="kid"><div class="name">${esc(names[k])}</div>
+      <div class="big ${cls(t)}">${fmt(t)}</div><div class="muted">累計</div>
+      <div class="muted">本週 <span class="${cls(w)}">${fmt(w)}</span></div></div>`;
+  }).join("");
+
+  $("thA").textContent = names.a; $("thB").textContent = names.b;
+  const dates = Object.keys(records).sort().reverse();
+  $("rows").innerHTML = dates.length ? dates.map(d => {
+    const cell = k => { const r = records[d][k]; return r ? `<span class="${cls(r.points)}">${fmt(r.points)}</span><span class="sub">${r.time}</span>` : `<span class="muted">—</span>`; };
+    return `<tr><td class="date">${d.slice(5).replace("-", "/")} 週${weekdayOf(d)}</td><td>${cell("a")}</td><td>${cell("b")}</td></tr>`;
+  }).join("") : '<tr><td colspan="3" class="muted">還沒有紀錄</td></tr>';
+  $("foot").innerHTML = `<tr><td class="date">累計</td>${KIDS.map(k => `<td class="${cls(totalOf(k))}">${fmt(totalOf(k))}</td>`).join("")}</tr>`;
+
+  const cur = $("fKid").value;
+  $("fKid").innerHTML = KIDS.map(k => `<option value="${k}">${esc(names[k])}</option>`).join("");
+  if (cur) $("fKid").value = cur;
+  if (document.activeElement !== $("nA")) $("nA").value = names.a;
+  if (document.activeElement !== $("nB")) $("nB").value = names.b;
+}
+
+$("fDate").value = dateKey(new Date());
+$("fTime").value = "06:45";
+$("fSave").onclick = () => {
+  if (!guard()) return;
+  const k = $("fKid").value, d = $("fDate").value, t = $("fTime").value;
+  if (!d || !t) return alert("請選擇日期和時間");
+  set(ref(db, "rooms/" + roomCode + "/records/" + d + "/" + k), { time: t, points: calcPoints(t) })
+    .catch(e => setStatus("儲存失敗:" + e.message, true));
+};
+$("fDel").onclick = () => {
+  if (!guard()) return;
+  const k = $("fKid").value, d = $("fDate").value;
+  if (!records[d] || !records[d][k]) return alert("這天沒有這位的紀錄");
+  if (confirm("確定刪除 " + d + " " + names[k] + " 的紀錄?")) remove(ref(db, "rooms/" + roomCode + "/records/" + d + "/" + k));
+};
+$("nSave").onclick = () => {
+  if (!guard()) return;
+  const a = $("nA").value.trim(), b = $("nB").value.trim();
+  if (!a || !b) return alert("名字不能空白");
+  set(ref(db, "rooms/" + roomCode + "/names"), { a, b });
+};
+
+render(); connect();
+</script>
+</body>
+</html>

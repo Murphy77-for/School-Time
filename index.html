@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>準備好了</title>
+<style>
+  :root { --bg:#f6f7f9; --text:#1d2330; --muted:#8a92a3; --main:#2f6fed; --plus:#15803d; --minus:#c2410c; --line:rgba(128,128,128,.3); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --text:#eef1f7; --muted:#8a92a3; --plus:#4ade80; --minus:#fb923c; } }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;
+         display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+  .date { color:var(--muted); margin-bottom:28px; font-size:17px; }
+  .kids { display:flex; flex-direction:column; gap:18px; width:100%; max-width:360px; }
+  .kid { text-align:center; }
+  .btn { width:100%; font:inherit; font-size:26px; font-weight:700; padding:26px 12px; border:0; border-radius:22px; background:var(--main); color:#fff; cursor:pointer; }
+  .btn.done { background:transparent; color:var(--text); border:2px solid var(--line); cursor:default; }
+  .btn small { display:block; font-size:15px; font-weight:400; margin-top:6px; color:var(--muted); }
+  .pts { font-size:34px; }
+  .pos { color:var(--plus); } .neg { color:var(--minus); }
+  .redo { background:none; border:0; color:var(--muted); font:inherit; font-size:13px; margin-top:6px; cursor:pointer; text-decoration:underline; }
+  .foot { margin-top:36px; text-align:center; font-size:15px; }
+  .foot a { color:var(--main); text-decoration:none; }
+  .msg { margin-top:14px; font-size:13px; color:var(--muted); min-height:1.2em; text-align:center; }
+  .msg.err { color:var(--minus); }
+  #codeBox { display:none; margin-top:18px; width:100%; max-width:360px; text-align:center; }
+  #codeBox input { font:inherit; padding:12px; border-radius:12px; border:1px solid var(--line); width:100%; background:transparent; color:var(--text); text-align:center; }
+  #codeBox button { margin-top:8px; font:inherit; padding:10px 18px; border-radius:12px; border:1px solid var(--main); background:transparent; color:var(--main); }
+</style>
+</head>
+<body>
+  <div class="date" id="date"></div>
+  <div class="kids" id="kids"></div>
+  <div class="msg" id="msg">連線中…</div>
+
+  <div id="codeBox">
+    <p class="msg">輸入家庭代碼(家人要相同)</p>
+    <input id="room" type="text" maxlength="30" placeholder="例如:wang-family-2026">
+    <button id="btnJoin">加入</button>
+  </div>
+
+  <div class="foot"><a href="records.html">查看紀錄 →</a> &nbsp;·&nbsp; <a href="#" id="chgCode" style="color:var(--muted)">家庭代碼</a></div>
+
+<script type="module">
+const firebaseConfig = {
+  apiKey: "AIzaSyDAUyONij0-f5ffYa82NqS2aQQm3AAW0bY",
+  authDomain: "school-time-f3d35.firebaseapp.com",
+  databaseURL: "https://school-time-f3d35-default-rtdb.firebaseio.com",
+  projectId: "school-time-f3d35",
+  storageBucket: "school-time-f3d35.firebasestorage.app",
+  messagingSenderId: "951888295382",
+  appId: "1:951888295382:web:757dd2570d51c125af2077"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const $ = id => document.getElementById(id);
+const KIDS = ["a", "b"];
+const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+let db, roomCode = (localStorage.getItem("room") || "").trim();
+let names = { a: "晏", b: "宸" }, records = {}, unsubs = [];
+
+function calcPoints(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const mins = h * 60 + m;
+  if (mins < 410) return 410 - mins;
+  if (mins > 420) return -(mins - 420);
+  return 0;
+}
+const fmt = p => (p > 0 ? "+" + p : String(p));
+const cls = p => (p > 0 ? "pos" : p < 0 ? "neg" : "");
+const pad = n => String(n).padStart(2, "0");
+const dateKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const timeNow = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const setMsg = (t, err) => { $("msg").textContent = t; $("msg").className = "msg" + (err ? " err" : ""); };
+
+function connect() {
+  if (!roomCode) { $("codeBox").style.display = "block"; setMsg(""); render(); return; }
+  try { if (!db) db = getDatabase(initializeApp(firebaseConfig)); }
+  catch (e) { setMsg("資料庫設定有誤:" + e.message, true); return; }
+  unsubs.forEach(u => u()); unsubs = [];
+  const base = "rooms/" + roomCode, onErr = e => setMsg("無法讀寫資料庫:" + e.message, true);
+  unsubs.push(onValue(ref(db, base + "/names"), s => { names = Object.assign({ a: "晏", b: "宸" }, s.val() || {}); render(); }, onErr));
+  unsubs.push(onValue(ref(db, base + "/records"), s => { records = s.val() || {}; setMsg(""); render(); }, onErr));
+}
+
+function render() {
+  const now = new Date();
+  $("date").textContent = (now.getMonth() + 1) + "月" + now.getDate() + "日 週" + WEEK[now.getDay()];
+  const today = dateKey(now);
+  $("kids").innerHTML = KIDS.map(k => {
+    const r = records[today] && records[today][k];
+    return r
+      ? `<div class="kid"><div class="btn done">${esc(names[k])}<span class="pts ${cls(r.points)}"> ${fmt(r.points)}</span><small>${r.time} 準備好</small></div>
+         <button class="redo" data-redo="${k}">重新記錄</button></div>`
+      : `<div class="kid"><button class="btn" data-now="${k}">${esc(names[k])}<small>準備好了</small></button></div>`;
+  }).join("");
+}
+
+function save(k) {
+  if (!db || !roomCode) return;
+  const t = timeNow();
+  set(ref(db, "rooms/" + roomCode + "/records/" + dateKey(new Date()) + "/" + k), { time: t, points: calcPoints(t) })
+    .catch(e => setMsg("儲存失敗:" + e.message, true));
+}
+
+document.addEventListener("click", e => {
+  const n = e.target.closest("[data-now]");
+  if (n) save(n.dataset.now);
+  const r = e.target.closest("[data-redo]");
+  if (r && confirm("要用現在的時間重新記錄嗎?")) save(r.dataset.redo);
+});
+
+$("chgCode").onclick = e => { e.preventDefault(); $("room").value = roomCode; $("codeBox").style.display = "block"; };
+$("btnJoin").onclick = () => {
+  const c = $("room").value.trim().replace(/[.#$\[\]\/]/g, "");
+  if (!c) return alert("請輸入家庭代碼");
+  localStorage.setItem("room", c); roomCode = c;
+  $("codeBox").style.display = "none"; connect();
+};
+
+render(); connect();
+</script>
+</body>
+</html>

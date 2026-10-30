@@ -3,44 +3,92 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f3d2f">
 <title>準備好了</title>
 <style>
-  :root { --bg:#f6f7f9; --text:#1d2330; --muted:#8a92a3; --main:#2f6fed; --plus:#15803d; --minus:#c2410c; --line:rgba(128,128,128,.3); }
-  @media (prefers-color-scheme: dark) { :root { --bg:#12151c; --text:#eef1f7; --muted:#8a92a3; --plus:#4ade80; --minus:#fb923c; } }
-  * { box-sizing:border-box; }
-  html, body { height:100%; }
-  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;
-         display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
-  .date { color:var(--muted); margin-bottom:28px; font-size:17px; }
-  .kids { display:flex; flex-direction:column; gap:18px; width:100%; max-width:360px; }
-  .kid { text-align:center; }
-  .btn { width:100%; font:inherit; font-size:26px; font-weight:700; padding:26px 12px; border:0; border-radius:22px; background:var(--main); color:#fff; cursor:pointer; }
-  .btn.done { background:transparent; color:var(--text); border:2px solid var(--line); cursor:default; }
-  .btn small { display:block; font-size:15px; font-weight:400; margin-top:6px; color:var(--muted); }
-  .pts { font-size:34px; }
-  .pos { color:var(--plus); } .neg { color:var(--minus); }
-  .redo { background:none; border:0; color:var(--muted); font:inherit; font-size:13px; margin-top:6px; cursor:pointer; text-decoration:underline; }
-  .foot { margin-top:36px; text-align:center; font-size:15px; }
-  .foot a { color:var(--main); text-decoration:none; }
-  .msg { margin-top:14px; font-size:13px; color:var(--muted); min-height:1.2em; text-align:center; }
-  .msg.err { color:var(--minus); }
-  #codeBox { display:none; margin-top:18px; width:100%; max-width:360px; text-align:center; }
-  #codeBox input { font:inherit; padding:12px; border-radius:12px; border:1px solid var(--line); width:100%; background:transparent; color:var(--text); text-align:center; }
-  #codeBox button { margin-top:8px; font:inherit; padding:10px 18px; border-radius:12px; border:1px solid var(--main); background:transparent; color:var(--main); }
+  :root {
+    --bg:#fde8dc; --head:#1f3d2f; --card:#ffffff; --text:#25302a; --muted:#7b857e;
+    --yellow:#f4c430; --green:#2e8b57; --green-soft:#e3f4e8; --orange:#f08a4b; --teal:#3aa6a0;
+    --plus:#1f7a47; --minus:#c8472b;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; min-height:100%; }
+  body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif; color-scheme:light; }
+
+  .head { background:var(--head); color:#fff; padding:22px 20px 20px; border-radius:0 0 28px 28px; box-shadow:0 4px 14px rgba(31,61,47,.25); }
+  .head .row { display:flex; align-items:center; justify-content:space-between; gap:10px; max-width:520px; margin:0 auto; }
+  .head h1 { margin:0; font-size:28px; letter-spacing:1px; }
+  .pill { background:var(--yellow); color:#3a2f00; font-weight:700; font-size:19px; padding:8px 16px; border-radius:999px; white-space:nowrap; }
+  .sub { max-width:520px; margin:10px auto 0; font-size:17px; color:#cfe3d6; }
+
+  .wrap { max-width:520px; margin:0 auto; padding:22px 18px 40px; }
+
+  .kid { position:relative; background:var(--card); border-radius:26px; padding:18px 18px 20px 26px; margin-bottom:20px;
+         box-shadow:0 6px 16px rgba(120,60,30,.12); overflow:hidden; transition:background .3s; }
+  .kid::before { content:""; position:absolute; left:0; top:0; bottom:0; width:12px; background:var(--accent); }
+  .kid.a { --accent:var(--orange); } .kid.b { --accent:var(--teal); }
+  .kid.done { background:var(--green-soft); }
+  .name { font-size:38px; font-weight:800; margin:0 0 12px; display:flex; align-items:center; gap:10px; }
+  .dot { width:18px; height:18px; border-radius:50%; background:var(--accent); display:inline-block; }
+
+  .btn { width:100%; font:inherit; font-size:30px; font-weight:800; padding:26px 12px; border:0; border-radius:22px; cursor:pointer;
+         background:var(--yellow); color:#3a2f00; box-shadow:0 6px 0 #c79a12; transition:transform .08s, box-shadow .08s; }
+  .btn:active { transform:translateY(5px); box-shadow:0 1px 0 #c79a12; }
+  .btn.done { background:var(--green); color:#fff; box-shadow:0 6px 0 #1f6b41; cursor:default; animation:pop .5s ease; }
+  .btn.done:active { transform:none; box-shadow:0 6px 0 #1f6b41; }
+
+  .result { display:flex; align-items:baseline; justify-content:space-between; margin-top:14px; padding:0 4px; }
+  .time { font-size:28px; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .pts { font-size:52px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
+  .pts small { font-size:20px; font-weight:600; margin-left:4px; }
+  .pos { color:var(--plus); } .neg { color:var(--minus); } .zero { color:var(--muted); }
+  .redo { background:none; border:0; color:var(--muted); font:inherit; font-size:17px; margin-top:10px; padding:6px 0; text-decoration:underline; cursor:pointer; }
+
+  .links { text-align:center; margin-top:10px; font-size:21px; font-weight:700; }
+  .links a { color:var(--head); text-decoration:none; background:#fff; padding:14px 24px; border-radius:999px; display:inline-block; box-shadow:0 4px 10px rgba(120,60,30,.12); }
+  .links a:active { transform:scale(.96); }
+  .tiny { text-align:center; margin-top:16px; }
+  .tiny a { color:var(--muted); font-size:15px; }
+
+  .msg { text-align:center; font-size:16px; color:var(--muted); min-height:1.3em; margin-bottom:10px; }
+  .msg.err { color:var(--minus); font-weight:600; }
+
+  #codeBox { display:none; background:#fff; border-radius:22px; padding:18px; margin-bottom:20px; text-align:center; box-shadow:0 6px 16px rgba(120,60,30,.12); }
+  #codeBox p { margin:0 0 10px; font-size:18px; }
+  #codeBox input { font:inherit; font-size:20px; padding:14px; border-radius:14px; border:2px solid #e2d6cf; width:100%; text-align:center; }
+  #codeBox button { margin-top:10px; font:inherit; font-size:20px; font-weight:700; padding:12px 28px; border:0; border-radius:14px; background:var(--head); color:#fff; }
+
+  .toast { position:fixed; left:50%; bottom:28px; transform:translate(-50%, 120px); background:var(--head); color:#fff; padding:16px 26px; border-radius:999px;
+           font-size:21px; font-weight:700; box-shadow:0 8px 20px rgba(0,0,0,.25); transition:transform .35s cubic-bezier(.2,1.4,.4,1); z-index:20; white-space:nowrap; }
+  .toast.show { transform:translate(-50%, 0); }
+
+  .confetti { position:fixed; top:-40px; font-size:30px; pointer-events:none; z-index:15; animation:fall linear forwards; }
+  @keyframes fall { to { transform:translateY(110vh) rotate(540deg); opacity:.9; } }
+  @keyframes pop { 0% { transform:scale(.85); } 55% { transform:scale(1.07); } 100% { transform:scale(1); } }
 </style>
 </head>
 <body>
-  <div class="date" id="date"></div>
-  <div class="kids" id="kids"></div>
-  <div class="msg" id="msg">連線中…</div>
-
-  <div id="codeBox">
-    <p class="msg">輸入家庭代碼(家人要相同)</p>
-    <input id="room" type="text" maxlength="30" placeholder="例如:wang-family-2026">
-    <button id="btnJoin">加入</button>
+  <div class="head">
+    <div class="row"><h1>🌅 早晨準備</h1><div class="pill" id="date"></div></div>
+    <div class="sub">7:00 前準備好,賺電視時間!</div>
   </div>
 
-  <div class="foot"><a href="records.html">查看紀錄 →</a> &nbsp;·&nbsp; <a href="#" id="chgCode" style="color:var(--muted)">家庭代碼</a></div>
+  <div class="wrap">
+    <div class="msg" id="msg">連線中…</div>
+
+    <div id="codeBox">
+      <p>輸入家庭代碼(家人要輸入一樣的)</p>
+      <input id="room" type="text" maxlength="30" placeholder="例如:wang-family-2026">
+      <button id="btnJoin">加入</button>
+    </div>
+
+    <div id="kids"></div>
+
+    <div class="links"><a href="records.html">📒 查看紀錄</a></div>
+    <div class="tiny"><a href="#" id="chgCode">更改家庭代碼</a></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
 
 <script type="module">
 const firebaseConfig = {
@@ -60,7 +108,7 @@ const $ = id => document.getElementById(id);
 const KIDS = ["a", "b"];
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 let db, roomCode = (localStorage.getItem("room") || "").trim();
-let names = { a: "晏", b: "宸" }, records = {}, unsubs = [];
+let names = { a: "晏", b: "宸" }, records = {}, unsubs = [], justSaved = null;
 
 function calcPoints(hhmm) {
   const [h, m] = hhmm.split(":").map(Number);
@@ -70,7 +118,7 @@ function calcPoints(hhmm) {
   return 0;
 }
 const fmt = p => (p > 0 ? "+" + p : String(p));
-const cls = p => (p > 0 ? "pos" : p < 0 ? "neg" : "");
+const cls = p => (p > 0 ? "pos" : p < 0 ? "neg" : "zero");
 const pad = n => String(n).padStart(2, "0");
 const dateKey = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 const timeNow = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
@@ -89,22 +137,47 @@ function connect() {
 
 function render() {
   const now = new Date();
-  $("date").textContent = (now.getMonth() + 1) + "月" + now.getDate() + "日 週" + WEEK[now.getDay()];
+  $("date").textContent = (now.getMonth() + 1) + "/" + now.getDate() + " 週" + WEEK[now.getDay()];
   const today = dateKey(now);
   $("kids").innerHTML = KIDS.map(k => {
     const r = records[today] && records[today][k];
-    return r
-      ? `<div class="kid"><div class="btn done">${esc(names[k])}<span class="pts ${cls(r.points)}"> ${fmt(r.points)}</span><small>${r.time} 準備好</small></div>
-         <button class="redo" data-redo="${k}">重新記錄</button></div>`
-      : `<div class="kid"><button class="btn" data-now="${k}">${esc(names[k])}<small>準備好了</small></button></div>`;
+    const body = r
+      ? `<div class="btn done ${justSaved === k ? "" : "still"}">✓ 已經準備好了</div>
+         <div class="result"><span class="time">⏰ ${r.time}</span><span class="pts ${cls(r.points)}">${fmt(r.points)}<small>分</small></span></div>
+         <button class="redo" data-redo="${k}">重新記錄</button>`
+      : `<button class="btn" data-now="${k}">準備好了</button>`;
+    return `<div class="kid ${k} ${r ? "done" : ""}"><div class="name"><span class="dot"></span>${esc(names[k])}</div>${body}</div>`;
   }).join("");
+  justSaved = null;
+}
+
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.classList.add("show");
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2600);
+}
+function confetti(emojis) {
+  for (let i = 0; i < 22; i++) {
+    const s = document.createElement("span");
+    s.className = "confetti"; s.textContent = emojis[i % emojis.length];
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.animationDuration = (1.6 + Math.random() * 1.4) + "s";
+    s.style.animationDelay = Math.random() * 0.3 + "s";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 3500);
+  }
 }
 
 function save(k) {
-  if (!db || !roomCode) return;
-  const t = timeNow();
-  set(ref(db, "rooms/" + roomCode + "/records/" + dateKey(new Date()) + "/" + k), { time: t, points: calcPoints(t) })
+  if (!db || !roomCode) { $("codeBox").style.display = "block"; return setMsg("請先輸入家庭代碼", true); }
+  const t = timeNow(), p = calcPoints(t);
+  if (navigator.vibrate) navigator.vibrate(60);
+  justSaved = k;
+  set(ref(db, "rooms/" + roomCode + "/records/" + dateKey(new Date()) + "/" + k), { time: t, points: p })
     .catch(e => setMsg("儲存失敗:" + e.message, true));
+  const n = names[k];
+  if (p > 0) { toast("🎉 " + n + " 太棒了!" + fmt(p) + " 分"); confetti(["🎉", "⭐", "✨", "🌟"]); }
+  else if (p === 0) { toast("👍 " + n + " 準時!今天 0 分"); confetti(["👍"]); }
+  else { toast("💪 " + n + " 明天加油!" + fmt(p) + " 分"); }
 }
 
 document.addEventListener("click", e => {

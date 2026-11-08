@@ -42,7 +42,7 @@
   <div class="status" id="status">連線中…</div>
 
   <div class="card" style="margin-top:12px">
-    <h2>累計分數 <span class="muted">(= 週末看電視的分鐘數)</span></h2>
+    <h2>本週電視時間 <span class="muted">(週一 00:00 歸零)</span></h2>
     <div class="kids" id="totals"></div>
   </div>
 
@@ -75,7 +75,7 @@
     <button class="ghost" id="nSave">儲存名字</button>
   </div>
 
-  <p class="muted" style="text-align:center">規則:6:50 前提早、7:00 後遲到,每 2 分鐘 = 電視 1 分鐘(四捨五入)· 6:50~7:00 不計 · 11/8 以前每 1 分鐘 = 1 分</p>
+  <p class="muted" style="text-align:center">規則:6:50 前提早、7:00 後遲到,每 2 分鐘 = 電視 1 分鐘(四捨五入)· 6:50~7:00 不計 · 電視時間每週一 00:00 歸零重算</p>
 </div>
 
 <script type="module">
@@ -96,7 +96,7 @@ const $ = id => document.getElementById(id);
 const KIDS = ["a", "b"];
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 let db, roomCode = (localStorage.getItem("room") || "").trim();
-let names = { a: "晏", b: "宸" }, records = {}, unsubs = [], showAll = false;
+let names = { a: "晏", b: "宸" }, records = {}, unsubs = [], showAll = false, shownDay = "";
 
 // 提早/遲到的分鐘數(6:50 前為正、7:00 後為負、中間為 0)
 function rawMin(hhmm) {
@@ -145,11 +145,15 @@ function totalOf(kid, filter) {
 function render() {
   const wk = new Date(); wk.setHours(0, 0, 0, 0); wk.setDate(wk.getDate() - ((wk.getDay() + 6) % 7));
   const wkKey = dateKey(wk);
+  const lw = new Date(wk); lw.setDate(lw.getDate() - 7);
+  const lastKey = dateKey(lw);
+  shownDay = dateKey(new Date());
   $("totals").innerHTML = KIDS.map(k => {
-    const t = totalOf(k), w = totalOf(k, d => d >= wkKey);
+    const w = totalOf(k, d => d >= wkKey);
+    const l = totalOf(k, d => d >= lastKey && d < wkKey);
     return `<div class="kid"><div class="name">${esc(names[k])}</div>
-      <div class="big ${cls(t)}">${fmt(t)}</div><div class="muted">累計</div>
-      <div class="muted">本週 <span class="${cls(w)}">${fmt(w)}</span></div></div>`;
+      <div class="big ${cls(w)}">${fmt(w)}</div><div class="muted">本週電視時間(分鐘)</div>
+      <div class="muted">上週結算 <span class="${cls(l)}">${fmt(l)}</span></div></div>`;
   }).join("");
 
   $("thA").textContent = names.a; $("thB").textContent = names.b;
@@ -162,7 +166,7 @@ function render() {
     const cell = k => { const r = records[d][k]; const p = r ? tvOf(d, r.time) : 0; return r ? `<span class="${cls(p)}">${fmt(p)}</span><span class="sub">${r.time}</span>` : `<span class="muted">—</span>`; };
     return `<tr><td class="date">${d.slice(5).replace("-", "/")} 週${weekdayOf(d)}</td><td>${cell("a")}</td><td>${cell("b")}</td></tr>`;
   }).join("") : '<tr><td colspan="3" class="muted">' + (hidden > 0 ? "本週還沒有紀錄" : "還沒有紀錄") + '</td></tr>';
-  $("foot").innerHTML = `<tr><td class="date">累計(全部)</td>${KIDS.map(k => `<td class="${cls(totalOf(k))}">${fmt(totalOf(k))}</td>`).join("")}</tr>`;
+  $("foot").innerHTML = `<tr><td class="date">本週累計</td>${KIDS.map(k => { const w = totalOf(k, d => d >= wkKey); return `<td class="${cls(w)}">${fmt(w)}</td>`; }).join("")}</tr>`;
 
   const cur = $("fKid").value;
   $("fKid").innerHTML = KIDS.map(k => `<option value="${k}">${esc(names[k])}</option>`).join("");
@@ -194,6 +198,11 @@ $("nSave").onclick = () => {
 };
 
 $("btnMore").onclick = () => { showAll = !showAll; render(); };
+
+// 頁面開著跨過午夜(尤其週一 00:00)時,自動換新的一週
+const checkDay = () => { if (dateKey(new Date()) !== shownDay) render(); };
+setInterval(checkDay, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkDay(); });
 
 render(); connect();
 </script>

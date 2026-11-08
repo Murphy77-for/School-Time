@@ -43,6 +43,8 @@
   .pts small { font-size:20px; font-weight:600; margin-left:4px; }
   .pos { color:var(--plus); } .neg { color:var(--minus); } .zero { color:var(--muted); }
   .detail { margin-top:8px; padding:0 4px; font-size:19px; color:var(--muted); }
+  .week { margin-top:14px; padding-top:12px; border-top:2px dashed #e4d9d2; font-size:20px; color:var(--muted); text-align:center; }
+  .week b { font-size:26px; }
   .redo { background:none; border:0; color:var(--muted); font:inherit; font-size:17px; margin-top:10px; padding:6px 0; text-decoration:underline; cursor:pointer; }
 
   .links { text-align:center; margin-top:10px; font-size:21px; font-weight:700; }
@@ -144,13 +146,27 @@ function connect() {
   unsubs.push(onValue(ref(db, base + "/records"), s => { records = s.val() || {}; setMsg(""); render(); }, onErr));
 }
 
+// 本週(週一起)累計的電視時間,週一 00:00 自動歸零
+function weekTotal(k) {
+  const wk = new Date(); wk.setHours(0, 0, 0, 0); wk.setDate(wk.getDate() - ((wk.getDay() + 6) % 7));
+  const wkKey = dateKey(wk);
+  let s = 0;
+  Object.keys(records).forEach(d => {
+    if (d < wkKey) return;
+    const r = records[d] && records[d][k];
+    if (r && r.time) s += tvOf(d, r.time);
+  });
+  return s;
+}
+
 function render() {
   const now = new Date();
   $("date").textContent = (now.getMonth() + 1) + "/" + now.getDate() + " 週" + WEEK[now.getDay()];
   const today = dateKey(now);
+  shownDay = today;
   $("kids").innerHTML = KIDS.map(k => {
     const r = records[today] && records[today][k];
-    const p = r ? tvOf(today, r.time) : 0, raw = r ? rawMin(r.time) : 0;
+    const p = r ? tvOf(today, r.time) : 0, raw = r ? rawMin(r.time) : 0, w = weekTotal(k);
     const detail = raw > 0 ? "提早 " + raw + " 分鐘" : raw < 0 ? "遲到 " + (-raw) + " 分鐘" : "準時";
     const body = r
       ? `<div class="btn done ${justSaved === k ? "" : "still"}">✓ 已經準備好了</div>
@@ -158,7 +174,8 @@ function render() {
          <div class="detail">${detail} · 電視時間 ${fmt(p)} 分鐘</div>
          <button class="redo" data-redo="${k}">重新記錄</button>`
       : `<button class="btn" data-now="${k}">準備好了</button>`;
-    return `<div class="kid ${k} ${r ? "done" : ""}"><div class="name"><span class="dot"></span>${esc(names[k])}</div>${body}</div>`;
+    return `<div class="kid ${k} ${r ? "done" : ""}"><div class="name"><span class="dot"></span>${esc(names[k])}</div>${body}
+      <div class="week">本週累計電視 <b class="${cls(w)}">${fmt(w)}</b> 分鐘</div></div>`;
   }).join("");
   justSaved = null;
 }
@@ -206,6 +223,12 @@ $("btnJoin").onclick = () => {
   localStorage.setItem("room", c); roomCode = c;
   $("codeBox").style.display = "none"; connect();
 };
+
+// 頁面開著跨過午夜時,自動換成新的一天
+let shownDay = "";
+const checkDay = () => { if (dateKey(new Date()) !== shownDay) render(); };
+setInterval(checkDay, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkDay(); });
 
 render(); connect();
 </script>

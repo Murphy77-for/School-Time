@@ -145,15 +145,11 @@ function totalOf(kid, filter) {
 function render() {
   const wk = new Date(); wk.setHours(0, 0, 0, 0); wk.setDate(wk.getDate() - ((wk.getDay() + 6) % 7));
   const wkKey = dateKey(wk);
-  const lw = new Date(wk); lw.setDate(lw.getDate() - 7);
-  const lastKey = dateKey(lw);
   shownDay = dateKey(new Date());
   $("totals").innerHTML = KIDS.map(k => {
     const w = totalOf(k, d => d >= wkKey);
-    const l = totalOf(k, d => d >= lastKey && d < wkKey);
     return `<div class="kid"><div class="name">${esc(names[k])}</div>
-      <div class="big ${cls(w)}">${fmt(w)}</div><div class="muted">本週電視時間(分鐘)</div>
-      <div class="muted">上週結算 <span class="${cls(l)}">${fmt(l)}</span></div></div>`;
+      <div class="big ${cls(w)}">${fmt(w)}</div><div class="muted">本週電視時間(分鐘)</div></div>`;
   }).join("");
 
   $("thA").textContent = names.a; $("thB").textContent = names.b;

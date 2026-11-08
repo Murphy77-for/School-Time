@@ -74,7 +74,7 @@
     <button class="ghost" id="nSave">儲存名字</button>
   </div>
 
-  <p class="muted" style="text-align:center">規則:6:50 前每早 1 分 +1 · 6:50~7:00 不計 · 7:00 後每晚 1 分 −1</p>
+  <p class="muted" style="text-align:center">規則:6:50 前提早、7:00 後遲到,每 2 分鐘 = 電視 1 分鐘(四捨五入)· 6:50~7:00 不計 · 11/8 以前每 1 分鐘 = 1 分</p>
 </div>
 
 <script type="module">
@@ -97,12 +97,20 @@ const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 let db, roomCode = (localStorage.getItem("room") || "").trim();
 let names = { a: "晏", b: "宸" }, records = {}, unsubs = [];
 
-function calcPoints(hhmm) {
+// 提早/遲到的分鐘數(6:50 前為正、7:00 後為負、中間為 0)
+function rawMin(hhmm) {
   const [h, m] = hhmm.split(":").map(Number);
   const mins = h * 60 + m;
   if (mins < 410) return 410 - mins;
   if (mins > 420) return -(mins - 420);
   return 0;
+}
+// 電視時間:2026-11-09 起為分鐘數的一半(四捨五入),之前 1 分鐘 = 1 分
+const HALF_FROM = "2026-11-09";
+function tvOf(date, hhmm) {
+  const raw = rawMin(hhmm);
+  const rate = date >= HALF_FROM ? 0.5 : 1;
+  return Math.sign(raw) * Math.round(Math.abs(raw) * rate);
 }
 const fmt = p => (p > 0 ? "+" + p : String(p));
 const cls = p => (p > 0 ? "pos" : p < 0 ? "neg" : "");
@@ -128,7 +136,7 @@ function totalOf(kid, filter) {
   Object.keys(records).forEach(d => {
     if (filter && !filter(d)) return;
     const r = records[d] && records[d][kid];
-    if (r && typeof r.points === "number") sum += r.points;
+    if (r && r.time) sum += tvOf(d, r.time);
   });
   return sum;
 }
@@ -146,7 +154,7 @@ function render() {
   $("thA").textContent = names.a; $("thB").textContent = names.b;
   const dates = Object.keys(records).sort().reverse();
   $("rows").innerHTML = dates.length ? dates.map(d => {
-    const cell = k => { const r = records[d][k]; return r ? `<span class="${cls(r.points)}">${fmt(r.points)}</span><span class="sub">${r.time}</span>` : `<span class="muted">—</span>`; };
+    const cell = k => { const r = records[d][k]; const p = r ? tvOf(d, r.time) : 0; return r ? `<span class="${cls(p)}">${fmt(p)}</span><span class="sub">${r.time}</span>` : `<span class="muted">—</span>`; };
     return `<tr><td class="date">${d.slice(5).replace("-", "/")} 週${weekdayOf(d)}</td><td>${cell("a")}</td><td>${cell("b")}</td></tr>`;
   }).join("") : '<tr><td colspan="3" class="muted">還沒有紀錄</td></tr>';
   $("foot").innerHTML = `<tr><td class="date">累計</td>${KIDS.map(k => `<td class="${cls(totalOf(k))}">${fmt(totalOf(k))}</td>`).join("")}</tr>`;
@@ -164,7 +172,7 @@ $("fSave").onclick = () => {
   if (!guard()) return;
   const k = $("fKid").value, d = $("fDate").value, t = $("fTime").value;
   if (!d || !t) return alert("請選擇日期和時間");
-  set(ref(db, "rooms/" + roomCode + "/records/" + d + "/" + k), { time: t, points: calcPoints(t) })
+  set(ref(db, "rooms/" + roomCode + "/records/" + d + "/" + k), { time: t, points: tvOf(d, t) })
     .catch(e => setStatus("儲存失敗:" + e.message, true));
 };
 $("fDel").onclick = () => {

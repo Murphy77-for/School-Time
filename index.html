@@ -42,6 +42,7 @@
   .pts { font-size:52px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
   .pts small { font-size:20px; font-weight:600; margin-left:4px; }
   .pos { color:var(--plus); } .neg { color:var(--minus); } .zero { color:var(--muted); }
+  .detail { margin-top:8px; padding:0 4px; font-size:19px; color:var(--muted); }
   .redo { background:none; border:0; color:var(--muted); font:inherit; font-size:17px; margin-top:10px; padding:6px 0; text-decoration:underline; cursor:pointer; }
 
   .links { text-align:center; margin-top:10px; font-size:21px; font-weight:700; }
@@ -70,7 +71,7 @@
 <body>
   <div class="head">
     <div class="row"><h1>🌅 早晨準備</h1><div class="pill" id="date"></div></div>
-    <div class="sub">7:00 前準備好,賺電視時間!</div>
+    <div class="sub">6:50 前準備好賺電視時間!(每 2 分鐘 = 1 分)</div>
   </div>
 
   <div class="wrap">
@@ -110,12 +111,20 @@ const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 let db, roomCode = (localStorage.getItem("room") || "").trim();
 let names = { a: "晏", b: "宸" }, records = {}, unsubs = [], justSaved = null;
 
-function calcPoints(hhmm) {
+// 提早/遲到的分鐘數(6:50 前為正、7:00 後為負、中間為 0)
+function rawMin(hhmm) {
   const [h, m] = hhmm.split(":").map(Number);
   const mins = h * 60 + m;
   if (mins < 410) return 410 - mins;
   if (mins > 420) return -(mins - 420);
   return 0;
+}
+// 電視時間:2026-11-09 起為分鐘數的一半(四捨五入),之前 1 分鐘 = 1 分
+const HALF_FROM = "2026-11-09";
+function tvOf(date, hhmm) {
+  const raw = rawMin(hhmm);
+  const rate = date >= HALF_FROM ? 0.5 : 1;
+  return Math.sign(raw) * Math.round(Math.abs(raw) * rate);
 }
 const fmt = p => (p > 0 ? "+" + p : String(p));
 const cls = p => (p > 0 ? "pos" : p < 0 ? "neg" : "zero");
@@ -141,9 +150,12 @@ function render() {
   const today = dateKey(now);
   $("kids").innerHTML = KIDS.map(k => {
     const r = records[today] && records[today][k];
+    const p = r ? tvOf(today, r.time) : 0, raw = r ? rawMin(r.time) : 0;
+    const detail = raw > 0 ? "提早 " + raw + " 分鐘" : raw < 0 ? "遲到 " + (-raw) + " 分鐘" : "準時";
     const body = r
       ? `<div class="btn done ${justSaved === k ? "" : "still"}">✓ 已經準備好了</div>
-         <div class="result"><span class="time">⏰ ${r.time}</span><span class="pts ${cls(r.points)}">${fmt(r.points)}<small>分</small></span></div>
+         <div class="result"><span class="time">⏰ ${r.time}</span><span class="pts ${cls(p)}">${fmt(p)}<small>分</small></span></div>
+         <div class="detail">${detail} · 電視時間 ${fmt(p)} 分鐘</div>
          <button class="redo" data-redo="${k}">重新記錄</button>`
       : `<button class="btn" data-now="${k}">準備好了</button>`;
     return `<div class="kid ${k} ${r ? "done" : ""}"><div class="name"><span class="dot"></span>${esc(names[k])}</div>${body}</div>`;
@@ -169,15 +181,15 @@ function confetti(emojis) {
 
 function save(k) {
   if (!db || !roomCode) { $("codeBox").style.display = "block"; return setMsg("請先輸入家庭代碼", true); }
-  const t = timeNow(), p = calcPoints(t);
+  const t = timeNow(), p = tvOf(dateKey(new Date()), t);
   if (navigator.vibrate) navigator.vibrate(60);
   justSaved = k;
   set(ref(db, "rooms/" + roomCode + "/records/" + dateKey(new Date()) + "/" + k), { time: t, points: p })
     .catch(e => setMsg("儲存失敗:" + e.message, true));
   const n = names[k];
-  if (p > 0) { toast("🎉 " + n + " 太棒了!" + fmt(p) + " 分"); confetti(["🎉", "⭐", "✨", "🌟"]); }
-  else if (p === 0) { toast("👍 " + n + " 準時!今天 0 分"); confetti(["👍"]); }
-  else { toast("💪 " + n + " 明天加油!" + fmt(p) + " 分"); }
+  if (p > 0) { toast("🎉 " + n + " 太棒了!電視 " + fmt(p) + " 分鐘"); confetti(["🎉", "⭐", "✨", "🌟"]); }
+  else if (p === 0) { toast("👍 " + n + " 已記錄!電視 0 分鐘"); confetti(["👍"]); }
+  else { toast("💪 " + n + " 明天加油!電視 " + fmt(p) + " 分鐘"); }
 }
 
 document.addEventListener("click", e => {

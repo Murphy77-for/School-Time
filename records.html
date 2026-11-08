@@ -53,6 +53,7 @@
       <tbody id="rows"><tr><td colspan="3" class="muted">還沒有紀錄</td></tr></tbody>
       <tfoot id="foot"></tfoot>
     </table>
+    <button class="ghost" id="btnMore" style="display:none"></button>
   </div>
 
   <div class="card">
@@ -95,7 +96,7 @@ const $ = id => document.getElementById(id);
 const KIDS = ["a", "b"];
 const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
 let db, roomCode = (localStorage.getItem("room") || "").trim();
-let names = { a: "晏", b: "宸" }, records = {}, unsubs = [];
+let names = { a: "晏", b: "宸" }, records = {}, unsubs = [], showAll = false;
 
 // 提早/遲到的分鐘數(6:50 前為正、7:00 後為負、中間為 0)
 function rawMin(hhmm) {
@@ -152,12 +153,16 @@ function render() {
   }).join("");
 
   $("thA").textContent = names.a; $("thB").textContent = names.b;
-  const dates = Object.keys(records).sort().reverse();
+  const all = Object.keys(records).sort().reverse();
+  const dates = showAll ? all : all.filter(d => d >= wkKey);   // 預設只顯示本週(週一起)
+  const hidden = all.length - dates.length;
+  $("btnMore").style.display = (hidden > 0 || showAll) ? "block" : "none";
+  $("btnMore").textContent = showAll ? "收起舊紀錄" : "顯示更早的紀錄(" + hidden + " 天)";
   $("rows").innerHTML = dates.length ? dates.map(d => {
     const cell = k => { const r = records[d][k]; const p = r ? tvOf(d, r.time) : 0; return r ? `<span class="${cls(p)}">${fmt(p)}</span><span class="sub">${r.time}</span>` : `<span class="muted">—</span>`; };
     return `<tr><td class="date">${d.slice(5).replace("-", "/")} 週${weekdayOf(d)}</td><td>${cell("a")}</td><td>${cell("b")}</td></tr>`;
-  }).join("") : '<tr><td colspan="3" class="muted">還沒有紀錄</td></tr>';
-  $("foot").innerHTML = `<tr><td class="date">累計</td>${KIDS.map(k => `<td class="${cls(totalOf(k))}">${fmt(totalOf(k))}</td>`).join("")}</tr>`;
+  }).join("") : '<tr><td colspan="3" class="muted">' + (hidden > 0 ? "本週還沒有紀錄" : "還沒有紀錄") + '</td></tr>';
+  $("foot").innerHTML = `<tr><td class="date">累計(全部)</td>${KIDS.map(k => `<td class="${cls(totalOf(k))}">${fmt(totalOf(k))}</td>`).join("")}</tr>`;
 
   const cur = $("fKid").value;
   $("fKid").innerHTML = KIDS.map(k => `<option value="${k}">${esc(names[k])}</option>`).join("");
@@ -187,6 +192,8 @@ $("nSave").onclick = () => {
   if (!a || !b) return alert("名字不能空白");
   set(ref(db, "rooms/" + roomCode + "/names"), { a, b });
 };
+
+$("btnMore").onclick = () => { showAll = !showAll; render(); };
 
 render(); connect();
 </script>

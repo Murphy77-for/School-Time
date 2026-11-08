@@ -32,6 +32,7 @@
   input, select { font:inherit; padding:10px; border-radius:10px; border:1px solid #c5cad6; background:var(--card); color:var(--text); width:100%; }
   button { font:inherit; border:0; border-radius:12px; padding:11px 14px; background:var(--main); color:#fff; cursor:pointer; width:100%; margin-top:8px; }
   button.ghost { background:transparent; color:var(--main); border:1px solid var(--main); }
+  button.linkbtn { background:none; color:var(--muted); border:0; width:auto; font-size:13px; margin:12px auto 0; padding:4px 8px; text-decoration:underline; }
   .status { font-size:13px; color:var(--muted); text-align:center; }
   .status.err { color:var(--minus); }
 </style>
@@ -53,7 +54,7 @@
       <tbody id="rows"><tr><td colspan="3" class="muted">還沒有紀錄</td></tr></tbody>
       <tfoot id="foot"></tfoot>
     </table>
-    <button class="ghost" id="btnMore" style="display:none"></button>
+    <button class="linkbtn" id="btnMore" style="display:none"></button>
   </div>
 
   <div class="card">
